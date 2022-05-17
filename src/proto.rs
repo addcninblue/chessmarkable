@@ -3,6 +3,7 @@ use crate::game::Player as PlecoPlayer;
 pub use crate::game::{ChessOutcome, SQ};
 use crate::{Player, Square};
 use anyhow::{Context, Result};
+use chess_pgn_parser::Game;
 use pleco::tools::Searcher;
 use serde::{Deserialize, Serialize};
 use std::thread;
@@ -10,7 +11,6 @@ use std::time::{Duration, SystemTime};
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::task;
-use chess_pgn_parser::Game;
 
 #[derive(Clone, Debug)]
 pub struct ChessConfig {
@@ -82,7 +82,7 @@ pub enum ChessUpdate {
     },
     CurrentTotalMovesReponse {
         total_moves: u16,
-    }
+    },
 }
 
 pub async fn create_game(

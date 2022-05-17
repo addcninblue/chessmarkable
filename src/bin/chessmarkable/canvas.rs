@@ -1,3 +1,4 @@
+use libremarkable::cgmath::vec2;
 pub use libremarkable::framebuffer::{
     cgmath::Point2, cgmath::Vector2, common::color, common::mxcfb_rect, common::DISPLAYHEIGHT,
     common::DISPLAYWIDTH, core::Framebuffer, storage::rgbimage_from_u8_slice, FramebufferBase,
@@ -8,7 +9,6 @@ use libremarkable::framebuffer::{
 };
 use libremarkable::image;
 use std::ops::DerefMut;
-use libremarkable::cgmath::vec2;
 
 pub struct Canvas<'a> {
     framebuffer: Box<Framebuffer<'a>>,
@@ -63,7 +63,16 @@ impl<'a> Canvas<'a> {
     //This is a quick hack which tries to prevent word clipping
     //I've found that the remarkable can do about a 95 characters at 35.0 font size
     //if you're looking for a nice default that fits the whole screen
-    pub fn draw_multi_line_text(&mut self, x_pos: Option<i32>, y_pos: i32, text: &str, max_chars_per_line: usize, max_lines: usize, size: f32, line_spacing: f32) -> mxcfb_rect {
+    pub fn draw_multi_line_text(
+        &mut self,
+        x_pos: Option<i32>,
+        y_pos: i32,
+        text: &str,
+        max_chars_per_line: usize,
+        max_lines: usize,
+        size: f32,
+        line_spacing: f32,
+    ) -> mxcfb_rect {
         let text_length = text.chars().count();
 
         if text_length > 0 {
@@ -87,14 +96,25 @@ impl<'a> Canvas<'a> {
                 if chars_taken_so_far + max_chars_per_line >= text_length {
                     chars_to_take = (text_length + 1) - chars_taken_so_far;
                 } else if text_rects.len() != max_lines - 1 {
-                    chars_to_take = match spaces_in_text.iter().rev().find(|char| **char < chars_taken_so_far + max_chars_per_line) {
+                    chars_to_take = match spaces_in_text
+                        .iter()
+                        .rev()
+                        .find(|char| **char < chars_taken_so_far + max_chars_per_line)
+                    {
                         None => max_chars_per_line,
-                        Some(chars) => chars - (chars_taken_so_far - 1)
+                        Some(chars) => chars - (chars_taken_so_far - 1),
                     };
                     chars_taken_so_far = chars_taken_so_far + chars_to_take;
                 }
                 let chunk: String = peekable.by_ref().take(chars_to_take).collect();
-                let text_rect = self.draw_text(Point2 { x: x_pos, y: Some(last_text_y + last_text_height) }, chunk.as_str(), size);
+                let text_rect = self.draw_text(
+                    Point2 {
+                        x: x_pos,
+                        y: Some(last_text_y + last_text_height),
+                    },
+                    chunk.as_str(),
+                    size,
+                );
                 last_text_height = text_rect.height as i32 + (size * line_spacing) as i32;
                 last_text_y = text_rect.top as i32;
                 text_rects.push(text_rect);
@@ -113,7 +133,7 @@ impl<'a> Canvas<'a> {
                 top: 0,
                 left: 0,
                 width: 0,
-                height: 0
+                height: 0,
             }
         }
     }
@@ -152,7 +172,13 @@ impl<'a> Canvas<'a> {
             .draw_text(pos, text, size, color::BLACK, false)
     }
 
-    fn draw_box(&mut self, pos: Point2<i32>, size: Vector2<u32>, border_px: u32, c: color) -> mxcfb_rect {
+    fn draw_box(
+        &mut self,
+        pos: Point2<i32>,
+        size: Vector2<u32>,
+        border_px: u32,
+        c: color,
+    ) -> mxcfb_rect {
         let top_left = pos;
         let top_right = pos + vec2(size.x as i32, 0);
         let bottom_left = pos + vec2(0, size.y as i32);
@@ -270,10 +296,7 @@ impl<'a> Canvas<'a> {
         font_size: f32,
     ) -> mxcfb_rect {
         let button_hitbox = self.draw_box(
-            Point2 {
-                x: 0,
-                y: y_pos,
-            },
+            Point2 { x: 0, y: y_pos },
             Vector2 {
                 x: DISPLAYWIDTH as u32,
                 y: y_height,
@@ -281,7 +304,14 @@ impl<'a> Canvas<'a> {
             5,
             color::BLACK,
         );
-        self.draw_text(Point2 { x: None, y: Some((button_hitbox.top + y_height / 2) as i32) }, text, font_size);
+        self.draw_text(
+            Point2 {
+                x: None,
+                y: Some((button_hitbox.top + y_height / 2) as i32),
+            },
+            text,
+            font_size,
+        );
         button_hitbox
     }
 
@@ -308,7 +338,7 @@ impl<'a> Canvas<'a> {
                 })
                 .unwrap(),
         )
-            .unwrap();
+        .unwrap();
 
         for (x, y, pixel) in rgba.enumerate_pixels() {
             let color_pix = [

@@ -2,8 +2,8 @@ mod board_select_scene;
 mod game_scene;
 mod main_menu_scene;
 mod pgn_select_scene;
-mod replay_scene;
 mod piece_images;
+mod replay_scene;
 
 pub use board_select_scene::BoardSelectScene;
 pub use game_scene::{GameMode, GameScene, SavestateSlot};

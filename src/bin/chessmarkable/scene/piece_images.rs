@@ -61,4 +61,3 @@ pub fn get_orig_piece_img(piece: &Piece) -> &'static image::DynamicImage {
         Piece::None => panic!("Cannot get img for Piece::None"),
     }
 }
-

@@ -1,11 +1,11 @@
-use anyhow::{Result};
-use serde::{Deserialize, Serialize};
-use std::path::{PathBuf};
+use anyhow::Result;
 use glob::glob;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Pgn {
-    pub path: PathBuf
+    pub path: PathBuf,
 }
 
 pub fn read(from: usize, to: usize) -> Result<Vec<Pgn>> {
@@ -18,17 +18,14 @@ pub fn read(from: usize, to: usize) -> Result<Vec<Pgn>> {
     } else {
         let elements_to_fetch = to - from + 1;
         let mut requested_pgns: Vec<Pgn> = Vec::with_capacity(elements_to_fetch);
-        for entry in glob(&construct_pgn_loc_pattern_string(pgn_loc)).
-            expect("Failed to read glob pattern")
+        for entry in glob(&construct_pgn_loc_pattern_string(pgn_loc))
+            .expect("Failed to read glob pattern")
             .skip(from)
-            .take(elements_to_fetch) {
+            .take(elements_to_fetch)
+        {
             match entry {
-                Ok(path) => {
-                    requested_pgns.push(Pgn {
-                        path
-                    })
-                }
-                Err(e) => println!("{:?}", e)
+                Ok(path) => requested_pgns.push(Pgn { path }),
+                Err(e) => println!("{:?}", e),
             }
         }
         Ok(requested_pgns)
@@ -42,11 +39,12 @@ pub fn total_number_of_pgn() -> u32 {
         info!("No pgn directory found");
         0
     } else {
-        for entry in glob(&construct_pgn_loc_pattern_string(pgn_loc))
-            .expect("Failed to read glob pattern") {
+        for entry in
+            glob(&construct_pgn_loc_pattern_string(pgn_loc)).expect("Failed to read glob pattern")
+        {
             match entry {
                 Ok(_) => pages = pages + 1,
-                Err(e) => println!("{:?}", e)
+                Err(e) => println!("{:?}", e),
             }
         }
         pages
