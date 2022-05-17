@@ -247,10 +247,9 @@ impl ChessGame {
                 _ => piecetype.char_upper().to_string(),
             };
 
-            let source_file = file_to_string(source.file());
-
-            let destination_file = file_to_string(destination.file());
-            let destination_rank = rank_to_string(destination.rank());
+            let source_file = source.file_char().to_string().to_lowercase();
+            let destination_file = destination.file_char().to_string().to_lowercase();
+            let destination_rank = destination.rank_char().to_string().to_lowercase();
 
             let capture = if last_move.is_capture() { "x" } else { "" };
             let promo_piece = if last_move.is_promo() {
@@ -263,33 +262,5 @@ impl ChessGame {
         };
         self.moves.push(move_string);
         Ok(())
-    }
-}
-
-#[inline]
-fn file_to_string<'a>(file: File) -> &'a str {
-    match file {
-        File::A => "a",
-        File::B => "b",
-        File::C => "c",
-        File::D => "d",
-        File::E => "e",
-        File::F => "f",
-        File::G => "g",
-        File::H => "h",
-    }
-}
-
-#[inline]
-fn rank_to_string<'a>(rank: Rank) -> &'a str {
-    match rank {
-        Rank::R1 => "1",
-        Rank::R2 => "2",
-        Rank::R3 => "3",
-        Rank::R4 => "4",
-        Rank::R5 => "5",
-        Rank::R6 => "6",
-        Rank::R7 => "7",
-        Rank::R8 => "8",
     }
 }

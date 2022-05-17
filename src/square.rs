@@ -62,6 +62,14 @@ impl Square {
     pub fn y(&self) -> u8 {
         self.sq.rank() as u8
     }
+
+    pub fn file_char(&self) -> char {
+        FILES[self.x() as usize]
+    }
+
+    pub fn rank_char(&self) -> char {
+        RANKS[self.y() as usize]
+    }
 }
 
 impl From<SQ> for Square {
