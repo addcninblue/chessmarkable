@@ -18,6 +18,7 @@ pub struct ChessGame {
     board: pleco::Board,
     board_moves_played_offset: u16,
     outcome: Option<ChessOutcome>,
+    moves: Vec<String>,
 }
 
 impl Default for ChessGame {
@@ -26,6 +27,7 @@ impl Default for ChessGame {
             board: Board::default(),
             board_moves_played_offset: 0,
             outcome: None,
+            moves: vec![],
         }
     }
 }
@@ -209,6 +211,7 @@ impl ChessGame {
             return Err(anyhow!("Move not found as possibility"));
         }
         let selected_move = selected_move.unwrap();
+        let piece = self.board.piece_at_sq(source.into());
 
         self.board.apply_move(selected_move);
         if let Err(e) = self.board.is_okay() {
@@ -219,7 +222,74 @@ impl ChessGame {
             ));
         }
 
+        let last_move = self.board.last_move().unwrap();
+        self.add_move_to_history(source, destination, last_move, piece.type_of());
         self.update_game_outcome();
+        println!("{:?}", self.moves);
         Ok(())
+    }
+
+    #[inline]
+    fn add_move_to_history(
+        &mut self,
+        source: Square,
+        destination: Square,
+        last_move: BitMove,
+        piecetype: PieceType,
+    ) -> Result<()> {
+        let move_string = if last_move.is_king_castle() {
+            "0-0".to_owned()
+        } else if last_move.is_queen_castle() {
+            "0-0-0".to_owned()
+        } else {
+            let piece_string = match piecetype {
+                PieceType::P => "".to_owned(),
+                _ => piecetype.char_upper().to_string(),
+            };
+
+            let source_file = file_to_string(source.file());
+
+            let destination_file = file_to_string(destination.file());
+            let destination_rank = rank_to_string(destination.rank());
+
+            let capture = if last_move.is_capture() { "x" } else { "" };
+            let promo_piece = if last_move.is_promo() {
+                last_move.promo_piece().char_upper().to_string()
+            } else {
+                "".to_owned()
+            };
+
+            format!("{piece_string}{source_file}{capture}{destination_file}{destination_rank}{promo_piece}").to_string()
+        };
+        self.moves.push(move_string);
+        Ok(())
+    }
+}
+
+#[inline]
+fn file_to_string<'a>(file: File) -> &'a str {
+    match file {
+        File::A => "a",
+        File::B => "b",
+        File::C => "c",
+        File::D => "d",
+        File::E => "e",
+        File::F => "f",
+        File::G => "g",
+        File::H => "h",
+    }
+}
+
+#[inline]
+fn rank_to_string<'a>(rank: Rank) -> &'a str {
+    match rank {
+        Rank::R1 => "1",
+        Rank::R2 => "2",
+        Rank::R3 => "3",
+        Rank::R4 => "4",
+        Rank::R5 => "5",
+        Rank::R6 => "6",
+        Rank::R7 => "7",
+        Rank::R8 => "8",
     }
 }
