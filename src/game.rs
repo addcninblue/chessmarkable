@@ -18,6 +18,7 @@ pub struct ChessGame {
     board: pleco::Board,
     board_moves_played_offset: u16,
     outcome: Option<ChessOutcome>,
+    previous_load_moves: String,
     moves: Vec<String>,
 }
 
@@ -27,6 +28,7 @@ impl Default for ChessGame {
             board: Board::default(),
             board_moves_played_offset: 0,
             outcome: None,
+            previous_load_moves: "".to_owned(),
             moves: vec![],
         }
     }
@@ -54,6 +56,19 @@ impl ChessGame {
 
     pub fn fen(&self) -> String {
         self.board.fen()
+    }
+
+    pub fn pgn(&self) -> String {
+        let new_moves: String = self.moves.chunks(2)
+            .enumerate()
+            .map(|(i, chunk)| match chunk.len() {
+                1 => format!("{}. {}", i+1, chunk[0]),
+                2 => format!("{}. {} {} ", i+1, chunk[0], chunk[1]),
+                _ => panic!("Invalid number of elements in chunk.")
+            })
+            .collect();
+
+        format!("{}{}", self.previous_load_moves, new_moves)
     }
 
     pub fn turn(&self) -> Player {
@@ -99,6 +114,9 @@ impl ChessGame {
         for _ in 0..count {
             self.board.undo_move();
         }
+
+        self.moves
+            .truncate(self.moves.len().saturating_sub(count.into()));
         self.update_game_outcome();
         Ok(())
     }
@@ -225,7 +243,7 @@ impl ChessGame {
         let last_move = self.board.last_move().unwrap();
         self.add_move_to_history(source, destination, last_move, piece.type_of());
         self.update_game_outcome();
-        println!("{:?}", self.moves);
+        println!("{:?}", self.pgn()); // TODO: Remove once done debugging
         Ok(())
     }
 
