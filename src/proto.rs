@@ -1,10 +1,11 @@
 use crate::game::ChessGame;
 use crate::game::Player as PlecoPlayer;
 pub use crate::game::{ChessOutcome, SQ};
-use crate::{Player, Square};
+use crate::{Player, Square, BitMoveWrapper};
 use anyhow::{Context, Result};
 use chess_pgn_parser::Game;
 use pleco::tools::Searcher;
+pub use pleco::BitMove;
 use serde::{Deserialize, Serialize};
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -25,7 +26,8 @@ pub enum ChessRequest {
     CurrentBoard,
     CurrentTotalMoves,
     CurrentOutcome,
-    MovePiece { source: Square, destination: Square },
+    // MovePiece { source: Square, destination: Square }, // TODO: See if can turn into BitMove
+    MovePiece { bit_move: BitMoveWrapper }, // TODO: See if can turn into BitMove
     Abort { message: String },
     UndoMoves { moves: u16 },
 }
@@ -44,24 +46,17 @@ pub enum ChessUpdate {
     /// Usually the Response to `ChessRequest::CurrentBoard`.
     /// But may be sent at other points to synchronize state as well.
     Board {
-        fen: String,
+        movelist: Option<Vec<BitMoveWrapper>>,
     },
-    PlayerMovedAPiece {
-        player: Player,
-        moved_piece_source: Square,
-        moved_piece_destination: Square,
-    },
-    /// Signal that a new player is now playing. The boar is the
-    /// most recent one which can also be retreived by requesting a
-    /// `ChessUpdate::Board` response.
-    PlayerSwitch {
-        player: Player,
-        fen: String,
+    PlayerMove {
+        player: Player, // Player who made the move
+        last_move: BitMoveWrapper,
+        moves_played: u16, // Before player made a move
     },
     MovePieceFailedResponse {
         // Response to `ChessRequest::MovePiece` when the action failed
         message: String,
-        fen: String,
+        rollback_move: BitMoveWrapper,
     },
     Outcome {
         outcome: Option<ChessOutcome>,
@@ -92,6 +87,7 @@ pub async fn create_game(
     config: ChessConfig,
 ) -> Result<()> {
     let mut game = if let Some(ref fen) = config.starting_fen {
+        todo!(); // Remove this
         ChessGame::from_fen(fen)?
     } else {
         ChessGame::default()
@@ -163,9 +159,9 @@ pub async fn create_game(
     });
 
     // Start (if not using a FEN then white starts)
-    send_to_everyone!(ChessUpdate::PlayerSwitch {
-        player: game.turn(),
-        fen: game.fen()
+    todo!("Figure out how to handle FENs or maybe remove them altogether?");
+    send_to_everyone!(ChessUpdate::Board {
+        movelist: Some(vec![])
     });
     // Send the starting player his possible moves
     let possible_moves: Vec<_> = game
@@ -226,7 +222,9 @@ pub async fn create_game(
         // Requests that players as well as spectators can send
         match request {
             ChessRequest::CurrentBoard => {
-                send_to_sender!(ChessUpdate::Board { fen: game.fen() });
+                send_to_sender!(ChessUpdate::Board {
+                    movelist: Some(game.movelist().into()),
+                });
             }
             ChessRequest::CurrentTotalMoves => {
                 send_to_sender!(ChessUpdate::CurrentTotalMovesReponse {
@@ -245,18 +243,16 @@ pub async fn create_game(
         let sender = sender
             .context("available_to_spectator() is probably not up to date with the handlers (message that has to be playerspecific was sent from a spectator)!!!")?;
         match request {
-            ChessRequest::MovePiece {
-                source,
-                destination,
-            } => {
+            ChessRequest::MovePiece { bit_move } => {
+                println!("moving piece");
                 let prev_outcome = game.outcome();
-                match game.move_piece(source, destination) {
+                let prev_moves_played = game.total_moves();
+                match game.move_piece(bit_move.into()) {
                     Ok(_) => {
-                        // Dunno why, but rust won't compile when using just "Ok". Error in the matrix??
-                        send_to_everyone!(ChessUpdate::PlayerMovedAPiece {
+                        send_to_everyone!(ChessUpdate::PlayerMove {
                             player: sender,
-                            moved_piece_source: source,
-                            moved_piece_destination: destination,
+                            last_move: bit_move,
+                            moves_played: prev_moves_played,
                         });
                         let new_outcome = game.outcome();
                         if prev_outcome != new_outcome {
@@ -264,12 +260,6 @@ pub async fn create_game(
                                 outcome: new_outcome
                             });
                         }
-
-                        // Signal other player that he can make his move (as long as not game over)
-                        send_to_everyone!(ChessUpdate::PlayerSwitch {
-                            player: game.turn(),
-                            fen: game.fen(),
-                        });
 
                         if new_outcome.is_none() {
                             // Send possible moves to player
@@ -288,7 +278,7 @@ pub async fn create_game(
                     Err(e) => {
                         send_to_sender!(ChessUpdate::MovePieceFailedResponse {
                             message: format!("Denied by engine: {}", e),
-                            fen: game.fen(),
+                            rollback_move: bit_move,
                         });
                     }
                 };
@@ -329,11 +319,13 @@ pub async fn create_game(
                                 outcome: new_outcome
                             });
                         }
-                        // Select current player and update board
-                        send_to_everyone!(ChessUpdate::PlayerSwitch {
-                            player: game.turn(),
-                            fen: game.fen()
-                        });
+                        todo!("Handle undos");
+                        // // Select current player and update board
+                        // send_to_everyone!(ChessUpdate::PlayerSwitch {
+                        //     player: game.turn(),
+                        //     last_move: game.last_move(),
+                        //     moves_played: game.total_moves(),
+                        // });
                         // Send the starting player his possible moves
                         let possible_moves: Vec<_> = game
                             .possible_moves()
@@ -378,16 +370,38 @@ pub async fn create_bot<T: Searcher>(
     task::spawn(async move {
         info!("Bot spawned for {}", me);
         let mut current_outcome: Option<ChessOutcome> = None;
+        let mut board = pleco::Board::default();
         while let Some(update) = update_rx.recv().await {
             match update {
-                ChessUpdate::PlayerSwitch { player, ref fen } => {
+                ChessUpdate::Board { movelist } => {
+                    board = pleco::Board::default();
+                    match movelist {
+                        None => {}
+                        Some(movelist) => {
+                            for single_move in movelist.into_iter() {
+                                board.apply_move(single_move.into());
+                            }
+                        }
+                    }
+                }
+                ChessUpdate::PlayerMove {
+                    player,
+                    last_move,
+                    moves_played,
+                } => {
                     if player == me && current_outcome.is_none() {
-                        let board = pleco::Board::from_fen(fen)
-                            .expect("Bot failed to parse the provided fen");
+                        assert!(
+                            board.turn() == player.into() && board.moves_played() == moves_played,
+                            "Turn desynchronized."
+                        );
+
+                        board.apply_move(last_move.into());
+
+                        let board_copy = pleco::Board::from_fen(&*board.fen()).unwrap();
 
                         let bit_move = task::spawn_blocking(move || {
                             let started = SystemTime::now();
-                            let bit_move = T::best_move(board, depth);
+                            let bit_move = T::best_move(board_copy, depth);
                             let elapsed = started.elapsed().unwrap_or(Duration::new(0, 0));
 
                             if elapsed < min_reaction_delay {
@@ -403,8 +417,7 @@ pub async fn create_bot<T: Searcher>(
 
                         request_tx
                             .send(ChessRequest::MovePiece {
-                                source: bit_move.get_src().into(),
-                                destination: bit_move.get_dest().into(),
+                                bit_move: bit_move.into()
                             })
                             .await
                             .expect("Bot failed to send move");

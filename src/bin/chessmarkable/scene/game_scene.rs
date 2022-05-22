@@ -73,8 +73,11 @@ pub enum SavestateSlot {
     Third,
 }
 
+// TODO: Add last_move BitMove check
 pub struct GameScene {
     board: Board,
+    last_player: Player,
+    last_moves_played: u16,
     /// May be above zero when a fen was imported. Used to prevent panic on undo.
     game_mode: GameMode,
     savestate_slot: SavestateSlot,
@@ -581,11 +584,11 @@ impl GameScene {
         self.last_move_to = None;
     }
 
-    fn update_board(&mut self, fen: &str) {
-        if self.board.fen() == fen {
+    fn update_board(&mut self, last_move: BitMove) {
+        if self.last_player == new_player {
             debug!("Ignored unchanged board");
         }
-        info!("Updated FEN: {}", fen);
+        info!("New move: {}", last_move);
 
         let new_board = match Board::from_fen(fen) {
             Ok(board) => board,
@@ -622,9 +625,11 @@ impl GameScene {
 
     fn handle_updates(&mut self, player: Player, update_receiver: &mut Receiver<ChessUpdate>) {
         for update in update_receiver.try_recv() {
-            //debug!("Got update for {}: {:#?}", player, update);
+            debug!("Got update for {}: {:#?}", player, update);
             match update {
-                ChessUpdate::Board { ref fen } => self.update_board(fen),
+                ChessUpdate::Board { ref fen } => {
+
+                    self.update_board(fen)},
                 ChessUpdate::GenericErrorResponse { message } => {
                     warn!(
                         "Received a GenericErrorResponse for {}: {}",
@@ -671,8 +676,8 @@ impl GameScene {
                     }
                     info!("{} (is_local_user: {}) made a move", player, is_local_user);
                 }
-                ChessUpdate::PlayerSwitch { player, ref fen } => {
-                    self.update_board(fen);
+                ChessUpdate::PlayerSwitch { player, ref last_move } => {
+                    self.update_board(last_move);
                     // TODO: Better message depending on game mode
                     if !self.is_game_over {
                         let message = if !self.is_local_user(player) {

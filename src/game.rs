@@ -18,6 +18,7 @@ pub struct ChessGame {
     board: pleco::Board,
     board_moves_played_offset: u16,
     outcome: Option<ChessOutcome>,
+    moves: Vec<BitMove>,
 }
 
 impl Default for ChessGame {
@@ -26,6 +27,7 @@ impl Default for ChessGame {
             board: Board::default(),
             board_moves_played_offset: 0,
             outcome: None,
+            moves: vec![],
         }
     }
 }
@@ -54,6 +56,10 @@ impl ChessGame {
         self.board.fen()
     }
 
+    pub fn movelist(&self) -> Vec<BitMove> {
+        self.moves
+    }
+
     pub fn turn(&self) -> Player {
         self.board.turn().into()
     }
@@ -64,6 +70,10 @@ impl ChessGame {
 
     pub fn total_moves(&self) -> u16 {
         self.board.moves_played()
+    }
+
+    pub fn last_move(&self) -> Option<BitMove> {
+        self.board.last_move()
     }
 
     pub fn total_undoable_moves(&self) -> u16 {
@@ -186,12 +196,12 @@ impl ChessGame {
         Ok((Square::from(SQ(selected_move.get_src_u8())), destination))
     }
 
-    pub fn move_piece(&mut self, source: Square, destination: Square) -> Result<()> {
-        ensure!(
-            self.piece_on_square(self.turn(), source),
-            "The playing player has no piece on the source square!"
-        );
-        ensure!(source != destination, "Move does not actually move");
+    pub fn move_piece(&mut self, bit_move: BitMove) -> Result<()> {
+        // ensure!(
+        //     self.piece_on_square(self.turn(), source),
+        //     "The playing player has no piece on the source square!"
+        // );
+        // ensure!(source != destination, "Move does not actually move");
         ensure!(
             self.outcome.is_none(),
             "Can't do move since the game has already ended."
@@ -199,19 +209,19 @@ impl ChessGame {
 
         // Find a legal move for `source` and `destination`
         // (i.e. including promotions or other special data)
-        let mut selected_move: Option<BitMove> = None;
-        for legal_move in self.board.generate_moves().iter() {
-            if legal_move.get_src_u8() == source.0 && legal_move.get_dest_u8() == destination.0 {
-                selected_move = Some(legal_move.clone());
-            }
-        }
-        if selected_move.is_none() {
-            return Err(anyhow!("Move not found as possibility"));
-        }
-        let selected_move = selected_move.unwrap();
+        // let mut selected_move: Option<BitMove> = None;
+        // for legal_move in self.board.generate_moves().iter() {
+        //     if legal_move.get_src_u8() == source.0 && legal_move.get_dest_u8() == destination.0 {
+        //         selected_move = Some(legal_move.clone());
+        //     }
+        // }
+        // if selected_move.is_none() {
+        //     return Err(anyhow!("Move not found as possibility"));
+        // }
+        // let selected_move = selected_move.unwrap();
 
-        self.board.apply_move(selected_move);
-        if let Err(e) = self.board.is_okay() {
+        self.board.apply_move(bit_move);
+        if let Err(e) = self.board.is_okay() { // TODO: Add this check elsewhere
             self.undo(1)?;
             return Err(anyhow!(
                 "Board got into illegal state after move. Reason: \"{:?}\"",
